@@ -1,0 +1,65 @@
+=== Unit Tests: center/server ===
+Date: Tue Mar 24 12:08:07 JST 2026
+
+=== RUN   TestAggregateWordCount
+--- PASS: TestAggregateWordCount (0.00s)
+=== RUN   TestAggregateSort
+--- PASS: TestAggregateSort (0.00s)
+=== RUN   TestAggregatePiEstimate
+--- PASS: TestAggregatePiEstimate (0.00s)
+=== RUN   TestAggregatePrimeCount
+--- PASS: TestAggregatePrimeCount (0.00s)
+=== RUN   TestAggregateGrep
+--- PASS: TestAggregateGrep (0.00s)
+=== RUN   TestAggregateHashCrack_Found
+--- PASS: TestAggregateHashCrack_Found (0.00s)
+=== RUN   TestAggregateHashCrack_NotFound
+--- PASS: TestAggregateHashCrack_NotFound (0.00s)
+=== RUN   TestSplitSort
+--- PASS: TestSplitSort (0.00s)
+=== RUN   TestSplitWordCount
+--- PASS: TestSplitWordCount (0.00s)
+=== RUN   TestSplitPiEstimate
+--- PASS: TestSplitPiEstimate (0.00s)
+=== RUN   TestSplitPrimeCount
+--- PASS: TestSplitPrimeCount (0.00s)
+=== RUN   TestSplitGrep
+--- PASS: TestSplitGrep (0.00s)
+=== RUN   TestSplitHashCrack
+--- PASS: TestSplitHashCrack (0.00s)
+=== RUN   TestSplitMatrixMul
+--- PASS: TestSplitMatrixMul (0.00s)
+=== RUN   TestNewID
+--- PASS: TestNewID (0.00s)
+=== RUN   TestMinMaxNorm
+--- PASS: TestMinMaxNorm (0.00s)
+=== RUN   TestMinMaxNorm_AllSame
+--- PASS: TestMinMaxNorm_AllSame (0.00s)
+=== RUN   TestMinMaxNorm_Empty
+--- PASS: TestMinMaxNorm_Empty (0.00s)
+=== RUN   TestMinMaxNorm_Single
+--- PASS: TestMinMaxNorm_Single (0.00s)
+PASS
+ok  	cmas/center	0.263s
+
+=== Unit Tests: site/server ===
+=== RUN   TestExecuteWordCount
+--- PASS: TestExecuteWordCount (0.00s)
+=== RUN   TestExecuteSort
+--- PASS: TestExecuteSort (0.00s)
+=== RUN   TestExecuteSort_TooLarge
+--- PASS: TestExecuteSort_TooLarge (0.02s)
+=== RUN   TestExecuteMatrixMul
+--- PASS: TestExecuteMatrixMul (0.00s)
+=== RUN   TestExecutePiEstimate
+--- PASS: TestExecutePiEstimate (0.00s)
+=== RUN   TestExecuteGrep
+--- PASS: TestExecuteGrep (0.00s)
+=== RUN   TestExecutePrimeCount
+--- PASS: TestExecutePrimeCount (0.00s)
+=== RUN   TestExecuteHashCrack_Found
+--- PASS: TestExecuteHashCrack_Found (0.00s)
+=== RUN   TestExecuteHashCrack_NotFound
+--- PASS: TestExecuteHashCrack_NotFound (0.00s)
+PASS
+ok  	cmas/site	0.226s

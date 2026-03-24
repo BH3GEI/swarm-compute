@@ -1,0 +1,18 @@
+=================================================================
+  swarm-compute Integration Test
+  Date: 2026-03-24 12:08:44
+=================================================================
+  [PASS] sort           result=[1,2,3,4,5]        (9ms, 5 workers)
+  [PASS] word-count     a=3, b=2, c=1             (6ms, 1 workers)
+  [PASS] pi-estimate    pi~3.14                   (11ms, 5 workers)
+  [PASS] prime-count    count=25 (correct)        (4ms, 5 workers)
+  [PASS] grep           2 matches                 (11ms, 3 workers)
+  [PASS] matrix-mul     [[19,22],[43,50]]         (11ms, 2 workers)
+  [PASS] hash-crack     found 'ab'                (5ms, 3 workers)
+  [PASS] workers API    5 workers registered
+  [PASS] stats API      15 jobs, avg 10ms
+  [PASS] job cancel     cancelled successfully
+  [PASS] rabbitmq       queue 'swarm_jobs' exists, durable=True
+
+  Result: 11/11 passed — ALL TESTS PASSED
+=================================================================

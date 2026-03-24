@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Task Types — swarm-compute</title>
+  <link rel="stylesheet" href="./assets/app.css"/>
+</head>
+<body>
+  <div class="wrap">
+    <div class="nav">
+      <a href="./task-types.html" style="border-color:var(--accent);">task-types</a>
+    </div>
+
+    <div class="h1">Registered Task Types</div>
+
+    <div class="card">
+      <button class="btn" id="btnRefresh">Refresh</button>
+      <table id="tbl" style="margin-top:12px;">
+        <thead><tr><th>TypeID</th><th>Name</th><th>Description</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div id="err" class="err"></div>
+    </div>
+  </div>
+
+  <script>
+    const CENTER = `${location.protocol}//${location.hostname}:8080`;
+
+    async function load() {
+      try {
+        const r = await fetch(`${CENTER}/api/task-types`);
+        const { taskTypes } = await r.json();
+        const tbody = document.querySelector('#tbl tbody');
+        tbody.innerHTML = '';
+        (taskTypes || []).forEach(tt => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${tt.typeId}</td><td>${tt.name}</td><td>${tt.description}</td>`;
+          tbody.appendChild(tr);
+        });
+      } catch (e) {
+        document.getElementById('err').textContent = e.message;
+      }
+    }
+
+    document.getElementById('btnRefresh').onclick = load;
+    load();
+  </script>
+</body>
+</html>

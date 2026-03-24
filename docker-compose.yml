@@ -1,0 +1,228 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    networks:
+      - cmas-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+    restart: always
+
+  center:
+    build: ./center
+    container_name: center
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - STORE_PATH=/data/store.json
+      - WORKER_ADDRS=worker-1:9000,worker-2:9000,worker-3:9000,worker-4:9000,worker-5:9000
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - center_data:/data
+    networks:
+      - cmas-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/task-types"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: always
+
+  platform:
+    build: ./platform
+    container_name: platform
+    ports:
+      - "8081:80"
+    environment:
+      - CENTER_BASE_URL=http://localhost:8080
+    networks:
+      - cmas-network
+    restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  client:
+    build: ./client
+    container_name: client
+    ports:
+      - "8082:80"
+    environment:
+      - CENTER_BASE_URL=http://localhost:8080
+    networks:
+      - cmas-network
+    restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  worker-1:
+    build: ./site
+    container_name: worker-1
+    environment:
+      - PORT=9000
+      - INSTANCE_ID=worker-1
+    networks:
+      - cmas-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9000/ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+    restart: always
+
+  worker-2:
+    build: ./site
+    container_name: worker-2
+    environment:
+      - PORT=9000
+      - INSTANCE_ID=worker-2
+    networks:
+      - cmas-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9000/ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+    restart: always
+
+  worker-3:
+    build: ./site
+    container_name: worker-3
+    environment:
+      - PORT=9000
+      - INSTANCE_ID=worker-3
+    networks:
+      - cmas-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9000/ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+    restart: always
+
+  worker-4:
+    build: ./site
+    container_name: worker-4
+    environment:
+      - PORT=9000
+      - INSTANCE_ID=worker-4
+    networks:
+      - cmas-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9000/ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+    restart: always
+
+  worker-5:
+    build: ./site
+    container_name: worker-5
+    environment:
+      - PORT=9000
+      - INSTANCE_ID=worker-5
+    networks:
+      - cmas-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9000/ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+    restart: always
+
+volumes:
+  center_data: {}
+
+networks:
+  cmas-network:
+    driver: bridge

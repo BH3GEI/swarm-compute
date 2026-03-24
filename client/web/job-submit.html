@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>swarm-compute</title>
+  <link rel="stylesheet" href="./assets/app.css"/>
+  <style>
+    .task-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:10px; margin-top:12px; }
+    .task-card { background:rgba(255,255,255,.03); border:1px solid var(--line); border-radius:10px; padding:12px; }
+    .status { display:inline-block; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:600; }
+    .status.done { background:rgba(34,197,94,.15); color:#4ade80; border:1px solid rgba(34,197,94,.3); }
+    .status.running { background:rgba(96,165,250,.15); color:#60a5fa; border:1px solid rgba(96,165,250,.3); }
+    .status.splitting,.status.aggregating { background:rgba(168,85,247,.15); color:#c084fc; border:1px solid rgba(168,85,247,.3); }
+    .status.failed { background:rgba(239,68,68,.15); color:#f87171; border:1px solid rgba(239,68,68,.3); }
+    .status.pending { background:rgba(156,163,175,.15); color:#9ca3af; border:1px solid rgba(156,163,175,.3); }
+    .status.cancelled { background:rgba(251,191,36,.15); color:#fbbf24; border:1px solid rgba(251,191,36,.3); }
+    .progress-bar { width:100%; height:6px; background:var(--line); border-radius:3px; margin-top:10px; overflow:hidden; }
+    .progress-fill { height:100%; background:var(--accent); border-radius:3px; transition:width .3s; }
+    .type-btn { padding:10px 16px; border-radius:10px; border:1px solid var(--line); background:rgba(255,255,255,.02); color:var(--text); cursor:pointer; transition:.15s; }
+    .type-btn:hover { border-color:var(--accent); }
+    .type-btn.active { border-color:var(--accent); background:rgba(96,165,250,.12); }
+    .result-box { margin-top:12px; padding:12px; background:rgba(0,0,0,.3); border-radius:10px; border:1px solid var(--line); white-space:pre-wrap; word-break:break-word; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:13px; max-height:400px; overflow:auto; }
+    .meta { font-size:12px; color:var(--muted); margin-top:6px; }
+    .job-header { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; }
+    /* Timeline */
+    .timeline { position:relative; margin-top:14px; background:rgba(0,0,0,.2); border-radius:8px; padding:8px; min-height:40px; }
+    .tl-bar { position:absolute; height:20px; border-radius:4px; font-size:10px; color:#fff; display:flex; align-items:center; padding:0 4px; white-space:nowrap; overflow:hidden; min-width:2px; }
+    .tl-label { font-size:11px; color:var(--muted); margin-bottom:2px; }
+    /* Bar chart for word-count */
+    .bar-chart { margin-top:8px; }
+    .bar-row { display:flex; align-items:center; gap:8px; margin-bottom:3px; }
+    .bar-word { width:100px; text-align:right; font-size:12px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; }
+    .bar-fill { height:16px; background:var(--accent); border-radius:3px; transition:width .3s; min-width:2px; }
+    .bar-count { font-size:11px; color:var(--muted); }
+    /* Stats */
+    .stats-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:10px; margin-top:10px; }
+    .stat-card { background:rgba(255,255,255,.03); border:1px solid var(--line); border-radius:10px; padding:12px; text-align:center; }
+    .stat-val { font-size:24px; font-weight:700; color:var(--accent); }
+    .stat-label { font-size:11px; color:var(--muted); margin-top:4px; }
+    /* Pi display */
+    .pi-display { font-size:48px; font-weight:700; text-align:center; color:var(--accent); margin:12px 0; font-family:ui-monospace,monospace; }
+    .pi-meta { text-align:center; color:var(--muted); font-size:13px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="nav">
+      <a href="./job-submit.html" style="border-color:var(--accent);">swarm-compute</a>
+    </div>
+
+    <div class="h1">Distributed Computing</div>
+
+    <!-- Task Type Selection -->
+    <div class="card">
+      <label>Select Task Type</label>
+      <div id="typeButtons" class="row" style="gap:8px;flex-wrap:wrap;"></div>
+      <div id="inputSection" class="input-area" style="display:none;margin-top:12px;">
+        <label id="inputLabel">Input</label>
+        <textarea id="jobInput" rows="6" placeholder=""></textarea>
+        <div class="row" style="margin-top:10px;gap:8px;">
+          <button class="btn primary" id="btnSubmit">Submit Job</button>
+          <span class="small" id="inputSize"></span>
+        </div>
+      </div>
+      <div id="err" class="err"></div>
+    </div>
+
+    <!-- Job Result -->
+    <div id="jobResult" class="card" style="display:none;">
+      <div class="job-header">
+        <div style="font-size:16px;font-weight:600;" id="jobTitle">Job</div>
+        <div class="row" style="gap:6px;">
+          <span id="jobStatus" class="status"></span>
+          <button class="btn danger" id="btnCancel" style="display:none;">Cancel</button>
+        </div>
+      </div>
+      <div class="meta" id="jobMeta"></div>
+      <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+
+      <!-- Timeline -->
+      <div id="timelineSection" style="display:none;">
+        <label style="margin-top:14px;">Execution Timeline</label>
+        <div class="timeline" id="timeline"></div>
+      </div>
+
+      <!-- Tasks -->
+      <label style="margin-top:14px;">Tasks</label>
+      <div id="taskCards" class="task-grid"></div>
+
+      <!-- Result -->
+      <div id="resultSection" style="display:none;">
+        <label style="margin-top:14px;">Result</label>
+        <div id="resultViz"></div>
+        <div class="result-box" id="resultBox"></div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="card">
+      <label>System Stats</label>
+      <div id="statsGrid" class="stats-grid"></div>
+    </div>
+
+    <!-- Job History -->
+    <div class="card">
+      <div class="row" style="justify-content:space-between;">
+        <label style="margin:0;">Job History</label>
+        <button class="btn" id="btnRefreshJobs">Refresh</button>
+      </div>
+      <div id="jobHistory" style="margin-top:10px;"></div>
+    </div>
+  </div>
+
+  <script src="./assets/job-api.js"></script>
+  <script>
+    let selectedType = null;
+    let currentJobId = null;
+    let pollTimer = null;
+
+    const WORKER_COLORS = ['#60a5fa','#34d399','#f472b6','#fbbf24','#a78bfa','#fb923c','#22d3ee','#e879f9'];
+
+    const typeDescriptions = {
+      'word-count':  { label:'Word Count',       inputLabel:'Text Input', placeholder:'Enter text to count word frequencies...\n\nExample:\nThe quick brown fox jumps over the lazy dog.\nThe dog barked at the fox.' },
+      'sort':        { label:'Distributed Sort',  inputLabel:'Numbers (comma-separated)', placeholder:'Enter numbers separated by commas:\n\n45, 12, 89, 3, 67, 23, 1, 56, 78, 34, 90, 11' },
+      'matrix-mul':  { label:'Matrix Multiply',   inputLabel:'Matrix JSON (a × b)', placeholder:'Enter as JSON:\n{\n  "a": [[1,2],[3,4],[5,6]],\n  "b": [[7,8,9],[10,11,12]]\n}' },
+      'pi-estimate': { label:'Monte Carlo Pi',    inputLabel:'Sample Count', placeholder:'Enter number of random samples:\n\n1000000' },
+      'grep':        { label:'Distributed Grep',  inputLabel:'Text + Pattern (JSON)', placeholder:'Enter as JSON:\n{\n  "text": "line1 hello\\nline2 world\\nline3 hello world",\n  "pattern": "hello"\n}' },
+      'prime-count': { label:'Prime Count',       inputLabel:'Range (JSON)', placeholder:'Enter as JSON:\n{\n  "from": 1,\n  "to": 1000000\n}' },
+      'hash-crack':  { label:'Hash Crack',        inputLabel:'Hash + Params (JSON)', placeholder:'Enter as JSON:\n{\n  "hash": "5d41402abc4b2a76b9719d911017c592",\n  "charset": "abcdefghijklmnopqrstuvwxyz",\n  "maxLen": 4\n}\n\n(The hash above is md5("hello"))' },
+    };
+
+    async function init() {
+      const { taskTypes } = await apiGetTaskTypes();
+      const container = document.getElementById('typeButtons');
+      container.innerHTML = '';
+      (taskTypes || []).forEach(tt => {
+        const btn = document.createElement('button');
+        btn.className = 'type-btn';
+        btn.textContent = (typeDescriptions[tt.typeId] || {}).label || tt.name;
+        btn.title = tt.description;
+        btn.onclick = () => selectType(tt.typeId, btn);
+        container.appendChild(btn);
+      });
+      loadJobHistory();
+      loadStats();
+    }
+
+    function selectType(typeId, btn) {
+      selectedType = typeId;
+      document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const desc = typeDescriptions[typeId] || {};
+      document.getElementById('inputSection').style.display = 'block';
+      document.getElementById('inputLabel').textContent = desc.inputLabel || 'Input';
+      document.getElementById('jobInput').placeholder = desc.placeholder || '';
+      document.getElementById('jobInput').value = '';
+      document.getElementById('err').textContent = '';
+    }
+
+    function parseInput(typeId, raw) {
+      if (typeId === 'word-count') return { text: raw };
+      if (typeId === 'sort') {
+        const nums = raw.split(',').map(s => parseFloat(s.trim())).filter(n => !isNaN(n));
+        if (nums.length === 0) throw new Error('Enter at least one number');
+        if (nums.length > 1000000) throw new Error('Max 1,000,000 numbers');
+        return { data: nums };
+      }
+      if (typeId === 'pi-estimate') {
+        const n = parseInt(raw.trim());
+        if (isNaN(n) || n < 1) throw new Error('Enter a positive integer');
+        if (n > 1e9) throw new Error('Max 1 billion samples');
+        return { samples: n };
+      }
+      // JSON-based types
+      try { return JSON.parse(raw); }
+      catch { return { text: raw }; }
+    }
+
+    // Input size display
+    document.getElementById('jobInput').addEventListener('input', e => {
+      const size = new Blob([e.target.value]).size;
+      const sizeEl = document.getElementById('inputSize');
+      if (size > 5*1024*1024) {
+        sizeEl.style.color = '#f87171';
+        sizeEl.textContent = `${(size/1024/1024).toFixed(1)}MB (too large!)`;
+      } else if (size > 100*1024) {
+        sizeEl.style.color = '#fbbf24';
+        sizeEl.textContent = `${(size/1024).toFixed(0)}KB`;
+      } else {
+        sizeEl.style.color = '';
+        sizeEl.textContent = size > 0 ? `${size}B` : '';
+      }
+    });
+
+    document.getElementById('btnSubmit').onclick = async () => {
+      const errEl = document.getElementById('err');
+      errEl.textContent = '';
+      if (!selectedType) { errEl.textContent = 'Select a task type'; return; }
+      const raw = document.getElementById('jobInput').value.trim();
+      if (!raw) { errEl.textContent = 'Enter input'; return; }
+      if (new Blob([raw]).size > 5*1024*1024) { errEl.textContent = 'Input too large (max 5MB)'; return; }
+
+      let input;
+      try { input = parseInput(selectedType, raw); }
+      catch (e) { errEl.textContent = 'Parse error: ' + e.message; return; }
+
+      const btn = document.getElementById('btnSubmit');
+      btn.disabled = true; btn.textContent = 'Submitting...';
+      try {
+        const job = await apiSubmitJob(selectedType, input);
+        if (job.error && !job.jobId) { errEl.textContent = job.error; return; }
+        showJob(job);
+        startPolling(job.jobId);
+      } catch (e) { errEl.textContent = 'Submit failed: ' + e.message; }
+      finally { btn.disabled = false; btn.textContent = 'Submit Job'; }
+    };
+
+    function startPolling(jobId) {
+      if (pollTimer) clearInterval(pollTimer);
+      currentJobId = jobId;
+      pollTimer = setInterval(async () => {
+        try {
+          const job = await apiGetJob(jobId);
+          showJob(job);
+          if (['done','failed','cancelled'].includes(job.status)) {
+            clearInterval(pollTimer); pollTimer = null;
+            loadJobHistory(); loadStats();
+          }
+        } catch {}
+      }, 800);
+    }
+
+    function showJob(job) {
+      currentJobId = job.jobId;
+      document.getElementById('jobResult').style.display = 'block';
+      document.getElementById('jobTitle').textContent = job.jobId;
+
+      const statusEl = document.getElementById('jobStatus');
+      statusEl.textContent = job.status;
+      statusEl.className = 'status ' + job.status;
+
+      // Cancel button
+      const cancelBtn = document.getElementById('btnCancel');
+      cancelBtn.style.display = ['pending','splitting','running'].includes(job.status) ? 'inline-block' : 'none';
+      cancelBtn.onclick = async () => { await apiCancelJob(job.jobId); };
+
+      const tasks = job.tasks || [];
+      const doneTasks = tasks.filter(t => t.status === 'done').length;
+      const pct = tasks.length > 0 ? Math.round((doneTasks / tasks.length) * 100) : 0;
+      document.getElementById('progressFill').style.width = pct + '%';
+
+      const dur = job.finishedAt && job.createdAt ? ((job.finishedAt - job.createdAt) / 1000).toFixed(2) + 's' : '...';
+      document.getElementById('jobMeta').textContent = `Type: ${job.typeId} | Tasks: ${doneTasks}/${tasks.length} | Duration: ${dur}`;
+
+      // Task cards
+      const container = document.getElementById('taskCards');
+      container.innerHTML = '';
+      tasks.forEach(t => {
+        const div = document.createElement('div');
+        div.className = 'task-card';
+        div.innerHTML = `
+          <div class="row" style="justify-content:space-between;">
+            <span class="small">${esc(t.taskId.slice(-8))}</span>
+            <span class="status ${t.status}">${t.status}</span>
+          </div>
+          <div class="small" style="margin-top:4px;">Worker: <b>${esc(t.workerId || '-')}</b></div>
+          ${t.durationMs ? `<div class="small">Duration: ${t.durationMs}ms</div>` : ''}
+          ${t.retryCount ? `<div class="small" style="color:#fbbf24;">Retries: ${t.retryCount}</div>` : ''}
+          ${t.error ? `<div class="err" style="font-size:11px;">${esc(t.error)}</div>` : ''}
+        `;
+        container.appendChild(div);
+      });
+
+      // Timeline
+      renderTimeline(job);
+
+      // Result
+      const resultSection = document.getElementById('resultSection');
+      if (job.status === 'done' && job.result != null) {
+        resultSection.style.display = 'block';
+        renderResultViz(job);
+        document.getElementById('resultBox').textContent = JSON.stringify(job.result, null, 2);
+      } else if (job.status === 'failed') {
+        resultSection.style.display = 'block';
+        document.getElementById('resultViz').innerHTML = '';
+        document.getElementById('resultBox').textContent = 'Error: ' + (job.error || 'unknown');
+      } else {
+        resultSection.style.display = 'none';
+      }
+    }
+
+    function renderTimeline(job) {
+      const section = document.getElementById('timelineSection');
+      const container = document.getElementById('timeline');
+      const tasks = (job.tasks || []).filter(t => t.startedAt);
+      if (tasks.length === 0) { section.style.display = 'none'; return; }
+      section.style.display = 'block';
+
+      const base = job.createdAt;
+      const maxEnd = Math.max(...tasks.map(t => (t.finishedAt || Date.now()) - base), 1);
+      const workerMap = {};
+      let idx = 0;
+      tasks.forEach(t => { if (t.workerId && !(t.workerId in workerMap)) workerMap[t.workerId] = idx++; });
+
+      const rowHeight = 28;
+      container.style.height = (Object.keys(workerMap).length * rowHeight + 16) + 'px';
+      container.innerHTML = '';
+
+      // Worker labels
+      for (const [wid, i] of Object.entries(workerMap)) {
+        const lbl = document.createElement('div');
+        lbl.className = 'tl-label';
+        lbl.style.position = 'absolute';
+        lbl.style.left = '0';
+        lbl.style.top = (i * rowHeight + 2) + 'px';
+        lbl.textContent = wid;
+        container.appendChild(lbl);
+      }
+
+      tasks.forEach(t => {
+        const wi = workerMap[t.workerId] || 0;
+        const start = ((t.startedAt - base) / maxEnd) * 100;
+        const width = Math.max(((t.finishedAt || Date.now()) - t.startedAt) / maxEnd * 100, 1);
+        const bar = document.createElement('div');
+        bar.className = 'tl-bar';
+        bar.style.left = Math.max(60, 60 + (start / 100) * (container.clientWidth - 70)) + 'px';
+        bar.style.width = Math.max(4, (width / 100) * (container.clientWidth - 70)) + 'px';
+        bar.style.top = (wi * rowHeight + 2) + 'px';
+        bar.style.background = WORKER_COLORS[wi % WORKER_COLORS.length];
+        bar.style.opacity = t.status === 'done' ? '1' : '0.5';
+        bar.title = `${t.taskId.slice(-8)} | ${t.durationMs || '...'}ms`;
+        bar.textContent = t.durationMs ? t.durationMs + 'ms' : '';
+        container.appendChild(bar);
+      });
+    }
+
+    function renderResultViz(job) {
+      const viz = document.getElementById('resultViz');
+      viz.innerHTML = '';
+
+      if (job.typeId === 'word-count' && typeof job.result === 'object') {
+        const entries = Object.entries(job.result).sort((a,b) => b[1] - a[1]).slice(0, 20);
+        if (entries.length === 0) return;
+        const maxVal = entries[0][1];
+        let html = '<div class="bar-chart">';
+        entries.forEach(([word, count]) => {
+          const pct = (count / maxVal * 100).toFixed(1);
+          html += `<div class="bar-row"><span class="bar-word">${esc(word)}</span><div class="bar-fill" style="width:${pct}%;max-width:300px;"></div><span class="bar-count">${count}</span></div>`;
+        });
+        html += '</div>';
+        viz.innerHTML = html;
+      }
+
+      if (job.typeId === 'pi-estimate' && job.result && job.result.pi) {
+        viz.innerHTML = `
+          <div class="pi-display">${job.result.pi.toFixed(10)}</div>
+          <div class="pi-meta">Samples: ${(job.result.totalSamples||0).toLocaleString()} | Error: ${job.result.error}</div>
+        `;
+      }
+
+      if (job.typeId === 'prime-count' && job.result) {
+        const r = job.result;
+        viz.innerHTML = `
+          <div class="pi-display">${(r.count||0).toLocaleString()}</div>
+          <div class="pi-meta">Primes in [${r.from}, ${r.to}]</div>
+          ${r.sample ? `<div class="pi-meta" style="margin-top:4px;">Last primes: ${r.sample.join(', ')}</div>` : ''}
+        `;
+      }
+
+      if (job.typeId === 'hash-crack' && job.result) {
+        const r = job.result;
+        if (r.found) {
+          viz.innerHTML = `<div class="pi-display" style="color:#4ade80;">Found: "${esc(r.value)}"</div><div class="pi-meta">Tried ${(r.totalTried||0).toLocaleString()} combinations</div>`;
+        } else {
+          viz.innerHTML = `<div class="pi-display" style="color:#f87171;">Not Found</div><div class="pi-meta">Tried ${(r.totalTried||0).toLocaleString()} combinations</div>`;
+        }
+      }
+
+      if (job.typeId === 'grep' && job.result) {
+        const r = job.result;
+        viz.innerHTML = `<div style="font-size:14px;color:var(--accent);margin-bottom:8px;">${r.count || 0} matches found</div>`;
+      }
+    }
+
+    async function loadStats() {
+      try {
+        const stats = await apiGetStats();
+        const grid = document.getElementById('statsGrid');
+        const items = [
+          { val: stats.totalJobs || 0, label: 'Total Jobs' },
+          { val: (stats.jobsByStatus||{}).done || 0, label: 'Completed' },
+          { val: (stats.jobsByStatus||{}).failed || 0, label: 'Failed' },
+          { val: stats.avgDurationMs ? (stats.avgDurationMs/1000).toFixed(1)+'s' : '-', label: 'Avg Duration' },
+          { val: (stats.workers||[]).length, label: 'Workers Used' },
+        ];
+        grid.innerHTML = items.map(i => `<div class="stat-card"><div class="stat-val">${i.val}</div><div class="stat-label">${i.label}</div></div>`).join('');
+      } catch {}
+    }
+
+    async function loadJobHistory() {
+      try {
+        const { jobs } = await apiListJobs();
+        const container = document.getElementById('jobHistory');
+        if (!jobs || jobs.length === 0) { container.innerHTML = '<div class="small">No jobs yet</div>'; return; }
+        jobs.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        container.innerHTML = '';
+        jobs.slice(0, 30).forEach(j => {
+          const div = document.createElement('div');
+          div.className = 'task-card';
+          div.style.cssText = 'cursor:pointer;margin-bottom:6px;';
+          div.dataset.jobId = j.jobId;
+          const ts = j.createdAt ? new Date(j.createdAt).toLocaleString() : '-';
+          const taskCount = (j.tasks || []).length;
+          div.innerHTML = `
+            <div class="row" style="justify-content:space-between;">
+              <span class="small">${esc(j.jobId)}</span>
+              <span class="status ${j.status}">${j.status}</span>
+            </div>
+            <div class="small">${esc(j.typeId)} | ${taskCount} tasks | ${ts}</div>
+          `;
+          container.appendChild(div);
+        });
+        // Event delegation — no XSS risk
+        container.onclick = async (e) => {
+          const card = e.target.closest('[data-job-id]');
+          if (!card) return;
+          const job = await apiGetJob(card.dataset.jobId);
+          showJob(job);
+          if (['pending','splitting','running'].includes(job.status)) startPolling(job.jobId);
+        };
+      } catch {}
+    }
+
+    document.getElementById('btnRefreshJobs').onclick = () => { loadJobHistory(); loadStats(); };
+
+    function esc(s) {
+      const d = document.createElement('div');
+      d.textContent = s || '';
+      return d.innerHTML;
+    }
+
+    init();
+  </script>
+</body>
+</html>
